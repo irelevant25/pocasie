@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Weather Forecast App</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="script-weatherapi.js"></script>
+    <script src="script-meteoapi.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="language-selector">
+                <div class="language-flag active" id="langEN" onclick="switchLanguage('en')" title="English">🇬🇧</div>
+                <div class="language-flag inactive" id="langSK" onclick="switchLanguage('sk')" title="Slovenčina">🇸🇰
+                </div>
+            </div>
+            <h1 id="appTitle">Weather Forecast</h1>
+            <div class="api-selector">
+                <label for="apiSelect" id="apiLabel">API:</label>
+                <select id="apiSelect" onchange="switchAPI()">
+                    <option value="openmeteo" id="optionOpenMeteo">Open-Meteo (Free 16-day)</option>
+                    <option value="weatherapi" id="optionWeatherAPI">WeatherAPI (3-day)</option>
+                </select>
+            </div>
+            <p id="apiDescription" style="font-size: 14px; color: #636e72; margin-top: 0.5rem">
+                Powered by Open-Meteo
+            </p>
+        </div>
+
+        <div class="cache-info" id="cacheInfo">
+            📱 Using cached data from today - no API call needed!
+        </div>
+
+        <div class="search-container">
+            <input type="text" class="search-input" id="cityInput" placeholder="Enter city name..." />
+            <button class="search-btn" id="searchBtn" onclick="getWeatherByCity()">Search</button>
+            <button class="location-btn" id="locationBtn" onclick="getLocationWeather()">
+                📍 <span id="locationBtnText">Use My Location</span>
+            </button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p id="loadingText">Loading weather data...</p>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <div id="weatherContainer" style="display: none">
+            <div class="current-weather">
+                <div class="location" id="location"></div>
+                <div class="weather-icon" id="currentIcon" style="font-size: 60px; margin: 1rem 0"></div>
+                <div class="current-temp" id="currentTemp"></div>
+                <div class="current-desc" id="currentDesc"></div>
+
+                <div class="current-details">
+                    <div class="current-detail">
+                        <div id="feelsLikeLabel">Feels Like</div>
+                        <div id="feelsLike"></div>
+                    </div>
+                    <div class="current-detail">
+                        <div id="humidityLabel">Humidity</div>
+                        <div id="humidity"></div>
+                    </div>
+                    <div class="current-detail">
+                        <div id="windSpeedLabel">Wind Speed</div>
+                        <div id="windSpeed"></div>
+                    </div>
+                    <div class="current-detail">
+                        <div id="uvIndexLabel">UV Index</div>
+                        <div id="uvIndex"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="forecast-container">
+                <h2 class="forecast-title" id="forecastTitle">16-Day Forecast</h2>
+                <div class="forecast-table">
+                    <div class="forecast-header">
+                        <div id="headerDay">Day</div>
+                        <div id="headerRange">Range</div>
+                        <div id="headerDayPeriod">☀️ Day</div>
+                        <div></div>
+                        <div id="headerNightPeriod">🌙 Night</div>
+                    </div>
+                    <div id="forecastGrid"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p id="footerText">
+                Free weather data from Open-Meteo.com | 16-day extended forecast available
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Language system
+        const TRANSLATIONS = {
+            en: {
+                appTitle: 'Weather Forecast',
+                apiLabel: 'API:',
+                optionOpenMeteo: 'Open-Meteo (Free 16-day)',
+                optionWeatherAPI: 'WeatherAPI (3-day)',
+                apiDescriptionOpenMeteo: 'Powered by Open-Meteo - Free 16-day forecasts',
+                apiDescriptionWeatherAPI: 'Powered by WeatherAPI.com - Requires API key',
+                cacheInfo: '📱 Using cached data from today - no API call needed!',
+                cityInputPlaceholder: 'Enter city name...',
+                searchBtn: 'Search',
+                locationBtnText: 'Use My Location',
+                loadingText: 'Loading weather data...',
+                forecastTitle16: '16-Day Forecast',
+                forecastTitle3: '3-Day Forecast',
+                headerDay: 'Day',
+                headerRange: 'Range',
+                headerDayPeriod: '☀️ Day',
+                headerNightPeriod: '🌙 Night',
+                feelsLikeLabel: 'Feels Like',
+                humidityLabel: 'Humidity',
+                windSpeedLabel: 'Wind Speed',
+                uvIndexLabel: 'UV Index',
+                footerTextOpenMeteo: 'Free weather data from Open-Meteo.com | 16-day extended forecast available',
+                footerTextWeatherAPI: 'Weather data from WeatherAPI.com | 3-day forecast',
+                today: 'Today',
+                tomorrow: 'Tomorrow',
+                errorCityNotFound: 'City not found',
+                errorEnterCity: 'Please enter a city name',
+                errorGeolocationNotSupported: 'Geolocation is not supported by this browser. Please search for a city manually.',
+                errorLocationDenied: 'Location access denied. Please search for a city manually.',
+                errorLocationUnavailable: 'Location information unavailable.',
+                errorLocationTimeout: 'Location request timed out.',
+                errorLocationUnknown: 'An unknown error occurred.',
+                errorUnableToGetLocation: 'Unable to get your location. ',
+                errorApiKey: 'Please set your WeatherAPI.com API key in the JavaScript code'
+            },
+            sk: {
+                appTitle: 'Predpoveď počasia',
+                apiLabel: 'API:',
+                optionOpenMeteo: 'Open-Meteo (Zdarma 16-dní)',
+                optionWeatherAPI: 'WeatherAPI (3 dni)',
+                apiDescriptionOpenMeteo: 'Využíva Open-Meteo - Bezplatné 16-dňové predpovede',
+                apiDescriptionWeatherAPI: 'Využíva WeatherAPI.com - Vyžaduje API kľúč',
+                cacheInfo: '📱 Používame uložené údaje z dneška - nie je potrebné volanie API!',
+                cityInputPlaceholder: 'Zadajte názov mesta...',
+                searchBtn: 'Hľadať',
+                locationBtnText: 'Použiť moju polohu',
+                loadingText: 'Načítavam údaje o počasí...',
+                forecastTitle16: '16-dňová predpoveď',
+                forecastTitle3: '3-dňová predpoveď',
+                headerDay: 'Deň',
+                headerRange: 'Rozsah',
+                headerDayPeriod: '☀️ Deň',
+                headerNightPeriod: '🌙 Noc',
+                feelsLikeLabel: 'Pocitová teplota',
+                humidityLabel: 'Vlhkosť',
+                windSpeedLabel: 'Rýchlosť vetra',
+                uvIndexLabel: 'UV index',
+                footerTextOpenMeteo: 'Bezplatné údaje o počasí z Open-Meteo.com | K dispozícii rozšírená 16-dňová predpoveď',
+                footerTextWeatherAPI: 'Údaje o počasí z WeatherAPI.com | 3-dňová predpoveď',
+                today: 'Dnes',
+                tomorrow: 'Zajtra',
+                errorCityNotFound: 'Mesto sa nenašlo',
+                errorEnterCity: 'Prosím zadajte názov mesta',
+                errorGeolocationNotSupported: 'Geolokácia nie je podporovaná týmto prehliadačom. Prosím vyhľadajte mesto manuálne.',
+                errorLocationDenied: 'Prístup k polohe bol zamietnutý. Prosím vyhľadajte mesto manuálne.',
+                errorLocationUnavailable: 'Informácie o polohe nie sú dostupné.',
+                errorLocationTimeout: 'Požiadavka na polohu vypršala.',
+                errorLocationUnknown: 'Vyskytla sa neznáma chyba.',
+                errorUnableToGetLocation: 'Nepodarilo sa získať vašu polohu. ',
+                errorApiKey: 'Prosím nastavte váš WeatherAPI.com API kľúč v JavaScript kóde'
+            }
+        };
+
+        // Current language
+        let currentLanguage = 'en';
+
+        // Detect browser language on load
+        function detectLanguage() {
+            const browserLang = navigator.language || navigator.userLanguage;
+            if (browserLang.startsWith('sk')) {
+                currentLanguage = 'sk';
+            } else {
+                currentLanguage = 'en';
+            }
+            updateLanguageFlags();
+        }
+
+        // Switch language function
+        function switchLanguage(lang) {
+            currentLanguage = lang;
+            updateLanguageFlags();
+            updateAllTexts();
+            updatePlaceholders();
+
+            // Save language preference
+            localStorage.setItem('weatherAppLanguage', lang);
+
+            // If weather data is currently displayed, refresh it to update translations
+            const weatherContainer = document.getElementById('weatherContainer');
+            if (weatherContainer.style.display !== 'none') {
+                refreshCurrentWeatherDisplay();
+            }
+        }
+
+        // Function to refresh the current weather display with new language
+        function refreshCurrentWeatherDisplay() {
+            const api = currentAPI === "openmeteo" ? meteoApi : weatherApi;
+
+            // Try to get cached data for current location/search
+            let cachedData = null;
+
+            // First try to get location data
+            if (api.isCacheValid(api.CACHE_KEYS.LOCATION_DATE)) {
+                cachedData = api.loadFromCache(api.CACHE_KEYS.LOCATION_DATA);
+            }
+
+            // If we have cached data, redisplay it with new language
+            if (cachedData) {
+                api.displayWeather(cachedData);
+            }
+        }
+
+        // Update language flag states
+        function updateLanguageFlags() {
+            const flagEN = document.getElementById('langEN');
+            const flagSK = document.getElementById('langSK');
+
+            if (currentLanguage === 'en') {
+                flagEN.className = 'language-flag active';
+                flagSK.className = 'language-flag inactive';
+            } else {
+                flagEN.className = 'language-flag inactive';
+                flagSK.className = 'language-flag active';
+            }
+        }
+
+        // Update all texts with current language
+        function updateAllTexts() {
+            const t = TRANSLATIONS[currentLanguage];
+
+            document.getElementById('appTitle').textContent = t.appTitle;
+            document.getElementById('apiLabel').textContent = t.apiLabel;
+            document.getElementById('optionOpenMeteo').textContent = t.optionOpenMeteo;
+            document.getElementById('optionWeatherAPI').textContent = t.optionWeatherAPI;
+            document.getElementById('cacheInfo').innerHTML = t.cacheInfo;
+            document.getElementById('searchBtn').textContent = t.searchBtn;
+            document.getElementById('locationBtnText').textContent = t.locationBtnText;
+            document.getElementById('loadingText').textContent = t.loadingText;
+            document.getElementById('headerDay').textContent = t.headerDay;
+            document.getElementById('headerRange').textContent = t.headerRange;
+            document.getElementById('headerDayPeriod').textContent = t.headerDayPeriod;
+            document.getElementById('headerNightPeriod').textContent = t.headerNightPeriod;
+            document.getElementById('feelsLikeLabel').textContent = t.feelsLikeLabel;
+            document.getElementById('humidityLabel').textContent = t.humidityLabel;
+            document.getElementById('windSpeedLabel').textContent = t.windSpeedLabel;
+            document.getElementById('uvIndexLabel').textContent = t.uvIndexLabel;
+
+            updateAPIDescription();
+        }
+
+        // Update placeholders
+        function updatePlaceholders() {
+            const t = TRANSLATIONS[currentLanguage];
+            document.getElementById('cityInput').placeholder = t.cityInputPlaceholder;
+        }
+
+        // Get translated day names
+        function getDayName(date, index) {
+            const t = TRANSLATIONS[currentLanguage];
+            if (index === 0) return t.today;
+            if (index === 1) return t.tomorrow;
+
+            const options = { weekday: 'long' };
+            const locale = currentLanguage === 'sk' ? 'sk-SK' : 'en-US';
+            const dayName = date.toLocaleDateString(locale, options);
+
+            // Capitalize first letter for Slovak days
+            return dayName.charAt(0).toUpperCase() + dayName.slice(1);
+        }
+
+        // Get formatted date
+        function getFormattedDate(date) {
+            const options = { month: 'short', day: 'numeric' };
+            const locale = currentLanguage === 'sk' ? 'sk-SK' : 'en-US';
+            return date.toLocaleDateString(locale, options);
+        }
+
+        // API references
+        const weatherApi = new WeatherApi();
+        const meteoApi = new MeteoApi();
+        let currentAPI = "openmeteo";
+
+        // Initialize language and app
+        window.addEventListener('DOMContentLoaded', function () {
+            // Check for saved language preference
+            const savedLang = localStorage.getItem('weatherAppLanguage');
+            if (savedLang && (savedLang === 'en' || savedLang === 'sk')) {
+                currentLanguage = savedLang;
+            } else {
+                detectLanguage();
+            }
+
+            updateLanguageFlags();
+            updateAllTexts();
+            updatePlaceholders();
+            updateAPIDescription();
+            checkCacheAndLoad();
+        });
+
+        // Allow Enter key to trigger search
+        document.getElementById('cityInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                getWeatherByCity();
+            }
+        });
+
+        function getWeatherByCity() {
+            if (currentAPI === "openmeteo") {
+                meteoApi.getWeatherByCity();
+            } else if (currentAPI === "weatherapi") {
+                weatherApi.getWeatherByCity();
+            }
+        }
+
+        function getLocationWeather() {
+            if (currentAPI === "openmeteo") {
+                meteoApi.getLocationWeather();
+            } else if (currentAPI === "weatherapi") {
+                weatherApi.getLocationWeather();
+            }
+        }
+
+        function switchAPI() {
+            const select = document.getElementById("apiSelect");
+            currentAPI = select.value;
+            updateAPIDescription();
+            hideWeatherContainer();
+            checkCacheAndLoad();
+        }
+
+        function updateAPIDescription() {
+            const description = document.getElementById("apiDescription");
+            const t = TRANSLATIONS[currentLanguage];
+            const forecastTitle = document.getElementById("forecastTitle");
+            const footerText = document.getElementById("footerText");
+
+            if (currentAPI === "openmeteo") {
+                description.textContent = t.apiDescriptionOpenMeteo;
+                forecastTitle.textContent = t.forecastTitle16;
+                footerText.textContent = t.footerTextOpenMeteo;
+            } else {
+                description.textContent = t.apiDescriptionWeatherAPI;
+                forecastTitle.textContent = t.forecastTitle3;
+                footerText.textContent = t.footerTextWeatherAPI;
+            }
+        }
+
+        function hideWeatherContainer() {
+            document.getElementById('weatherContainer').style.display = 'none';
+        }
+
+        async function checkCacheAndLoad() {
+            const api = currentAPI === "openmeteo" ? meteoApi : weatherApi;
+            if (api.isCacheValid(api.CACHE_KEYS.LOCATION_DATE)) {
+                const cachedData = api.loadFromCache(api.CACHE_KEYS.LOCATION_DATA);
+                if (cachedData) {
+                    console.log('Using cached location data from today');
+                    api.displayWeather(cachedData);
+                    api.showWeatherContainer();
+                    api.showCacheInfo();
+                    return;
+                }
+            }
+            api.getLocationWeather();
+        }
+    </script>
+</body>
+
+</html>
